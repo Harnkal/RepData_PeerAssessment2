@@ -1,0 +1,311 @@
+---
+title: "Economical and Public Health Impacts of Severe Weather Events in the US"
+author: "Rafael Silva"
+output: html_document
+
+---
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern. 
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+The basic goal of this study is to explore the NOAA Storm Database and answer the following questions about severe weather events:
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+2. Across the United States, which types of events have the greatest economic consequences?
+
+This study aims to provide information for authorities who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events.
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+## System info
+
+In this section is provided some info about the system being used to perform this analysis. It is also important to point out that all the packages used during the analysis are the most recent available at the present date.
+
+```{r}
+version
+```
+
+## Library
+
+In the next chunk, all the packages used during the analysis are loaded
+
+```{r, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(gridExtra)
+library(grid)
+```
+
+PS.: For some reason the lubridate didn't load along with the tidyverse, so it had to be loaded separately.
+
+## Data download
+
+For reproducibility purposes, by running the chuck below it is possible to download the dataset used during this analysis and its documentation. For more information on the date in which the data set was downloaded read the section system info.
+
+In order to improve the code readability of the code, some temporary variables where created. So, by the end of the chuck they are cleaned.
+
+```{r, results="hide"}
+URL1 <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+URL2 <- "https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf"
+URL3 <- "https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf"
+URL4 <- "http://www.census.gov/2010census/xls/fips_codes_website.xls"
+
+if(!dir.exists("./data")) dir.create("./data")
+if(!file.exists("./data/data.bz2")) download.file(URL1, "./data/data.bz2", 
+                                                  quiet = TRUE)
+if(!file.exists("./data/dataDoc.pdf")) download.file(URL2, "./data/dataDoc.pdf", 
+                                                     mode = "wb", quiet = TRUE)
+if(!file.exists("./data/FAQ.pdf")) download.file(URL3, "./data/FAQ.pdf", 
+                                                 mode = "wb", quiet = TRUE)
+if(!file.exists("./data/FIPS.xls")) download.file(URL4, "./data/FIPS.xls",
+                                                  quiet = TRUE)
+
+rm(list = ls())
+```
+
+## Data Processing
+
+The following code was used to read the data into R. Note that, the data was not decompressed as an option to save hard drive space. 
+
+In order to choose the best function to read the data, performance-wise, the functions read.csv(), read.table(sep = ",") and fread() where tested, although all of them where able to read the data correctly, read.csv had a slightly better performance on the system in which the analysis was run.
+
+```{r}
+stormData <- read.csv("./data/data.bz2")
+```
+
+For this analysis, the necessary variables are: BGN_DATE, EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, and CROPDMGEXP.
+
+```{r}
+stormData <- stormData[, c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES", 
+                           "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+```
+
+The main object of this analysis is the variable EVTYPE (which lists the type of event that occurred in that observation). According to the documentation, "The only events permitted in Storm Data are listed in Table 1 of Section 2.1.1.", and there should be 48 unique EVTYPEs, however, as it is possible to observe in the output of the chunk below, there are many more than that. It is believed that most of these duplications occur due to miss types. In the next chunk a list is initialized with all the 48 EVTYPES according to the documentation and the total amount of EVTYPES we have in the data is calculated.
+
+```{r}
+correctEVTYPE <- c("Astronomical Low Tide", "Avalanche", "Blizzard", "Coastal Flood",
+                   "Cold/Wind Chill", "Debris Flow", "Dense Fog", "Dense Smoke",
+                   "Drought", "Dust Devil", "Dust Storm", "Excessive Heat",
+                   "Extreme Cold/Wind Chill", "Flash Flood", "Flood", "Frost/Freeze",
+                   "Funnel Cloud", "Freezing Fog", "Hail", "Heat", "Heavy Rain", 
+                   "Heavy Snow", "High Surf", "High Wind", "Hurricane (Typhoon)",
+                   "Ice Storm", "Lake-Effect Snow", "Lakeshore Flood", "Lightning",
+                   "Marine Hail", "Marine High Wind", "Marine Strong Wind", 
+                   "Marine Thunderstorm Wind", "Rip Current", "Seiche", "Sleet",
+                   "Storm Surge/Tide", "Strong Wind", "Thunderstorm Wind", "Tornado",
+                   "Tropical Depression", "Tropical Storm", "Tsunami", "Volcanic Ash",
+                   "Waterspout", "Wildfire", "Winter Storm", "Winter Weather")
+correctEVTYPE <- toupper(correctEVTYPE)
+
+length(unique(stormData$EVTYPE))
+```
+
+Before addressing the typos, it is a good strategy to look at which part of the data our analysis will aim, this way, we can already remove some of this occurrences. In the next chunk, it is possible to take a closer look into the dates at which the observations where collected.
+
+```{r}
+stormData$BGN_DATE <- mdy_hms(stormData$BGN_DATE)
+
+yearMin <- min(year(stormData$BGN_DATE))
+yearMax <- max(year(stormData$BGN_DATE))
+dataPercent <- paste(format(mean(year(stormData$BGN_DATE) > 2001) * 100, 
+                            digits = 2), "%", sep = "")
+```
+
+When looking in to the acquisition dates it is possible to see that the data acquisition starts in `r yearMin` and finishes in `r yearMax`. When talking about economical and health damages, it safe to say that the relevance of the data collected more than 10 years ago is very low, as this data was collected in a completely different economical scenario and the efficiency of the communications where very low compared to nowadays (which may save many lives), besides that, `r dataPercent` of the data was collected in the last 15 years. With that in mind the data was subseted to show only that data collected from 2001 ahead.
+
+```{r}
+validData <- subset(stormData, year(BGN_DATE) >= 2001)
+```
+
+As this analysis is focused on economical damages and harmfulness with respect to population health, another way of subsetting the data is by removing the observations in which the total sum of FATALITIES, INJURIES, PROPDMG, and CROPDMG are equal to 0.
+
+```{r}
+sumDMG <- rowSums(validData[, c("FATALITIES", "INJURIES", "PROPDMG", "CROPDMG")])
+
+validData <- subset(validData, sumDMG > 0)
+
+length(unique(validData$EVTYPE))
+```
+
+Although the subsetting is valid, it did not solve completely the EVTYPE problems mentioned earlier, so in the next chunk some strategies are applied to minimize the problem. After applying these changes to the data, it is verified the percentage of observations that do not comply with the documentation list.
+
+```{r}
+## Removing leading/trailling spaces
+validData$EVTYPE <- trimws(validData$EVTYPE)
+## Standardizing case
+validData$EVTYPE <- toupper(validData$EVTYPE)
+## Removing double spaces
+validData$EVTYPE <- gsub("(?<=[\\s])\\s*|^\\s+|\\s+$", "", validData$EVTYPE, perl=TRUE)
+## Removing plural of the last words
+validData$EVTYPE <- gsub("S$", "", validData$EVTYPE)
+
+length(unique(validData$EVTYPE))
+mean(!validData$EVTYPE %in% correctEVTYPE)
+```
+
+To better understand the impact of the non compliant observations, it is necessary to calculate total economical damage and the total health related damages. In order to do this, it is necessary to calculate the total property damages (currently divided in 2 variables PROPDMG and PROPDMGEXP) and total crop damages (currently divided in 2 variables CROPDMG and CROPDMGEXP) caused by each observation. Also, this calculations are used in the further steps of the analysis. This can be done by the function defined below. For more information on how to handle CROPDMGEXP and PROPDMGEXP: [How To Handle Exponent Value of PROPDMGEXP and CROPDMGEXP](https://rstudio-pubs-static.s3.amazonaws.com/58957_37b6723ee52b455990e149edde45e5b6.html).
+
+```{r}
+TOTALDMG <- function(DMG, EXP) {
+      if(EXP == "H" | EXP == "h") {EXP <- 10^2}
+      else if(EXP == "K" | EXP == "k") {EXP <- 10^3}
+      else if(EXP == "M" | EXP == "m") {EXP <- 10^6} 
+      else if(EXP == "B" | EXP == "b") {EXP <- 10^9} 
+      else if(EXP %in% 1:8) {EXP <- 10}
+      else if(EXP == "+") {EXP <- 1} 
+      else {EXP <- 0}
+      DMG * EXP
+}
+```
+
+By applying this function to the variables in the dataset it is possible to calculate the TOTALPROPDMG and the TOTALCROPDMG.
+
+```{r}
+validData$TOTALPROPDMG <- with(validData, mapply(TOTALDMG, PROPDMG, PROPDMGEXP))
+validData$TOTALCROPDMG <- with(validData, mapply(TOTALDMG, CROPDMG, CROPDMGEXP))
+
+validData <- validData %>%
+      select(-PROPDMG, -PROPDMGEXP, -CROPDMG, -CROPDMGEXP)
+```
+
+Now, back to the matter at hand, the next chunk answers the question: what is the impact of the observations with EVTYPES that do not comply with the documentation.
+
+```{r}
+impact <- validData %>%
+      mutate(COMPLIANT = EVTYPE %in% correctEVTYPE) %>%
+      group_by(COMPLIANT) %>%
+      summarize(FATALITIES = sum(FATALITIES),
+                INJURIES = sum(INJURIES),
+                TOTALPROPDMG = sum(TOTALPROPDMG*1e-9),
+                TOTALCROPDMG = sum(TOTALCROPDMG*1e-9))
+
+impact <- impact[1, 2:5]/(impact[1, 2:5]+impact[2, 2:5])*100
+
+print(impact)
+```
+
+In a first look, the impact seem very high with `r format(impact[1,3], digits = 2)`% impact on the TOTALPROPDMG. Considering that the EVTYPEs would have been merged the other EVTYPES, discarding the observations that are out of compliance from the data set at this point will introduce a _average error margin to each EVTYPE index_ of +`r format(impact[1,1]/48, digits = 2)`% on FATALITIES, +`r format(impact[1,2]/48, digits = 2)`% on INJURIES, +`r format(impact[1,3]/48, digits = 2)`% on TOTALPROPDMG, and +`r format(impact[1,4]/48, digits = 2)`% on TOTALCROPDMG.Although the error variance have not been taken in consideration, the average error margin have been considered acceptable for the study at hand.
+
+With this matter solved, it is possible to proceed to the last part of the data processing, subsetting and summarizing, which is accomplished by the chunk below.
+
+```{r}
+validData <- validData %>%
+      filter(EVTYPE %in% correctEVTYPE) %>%
+      group_by(EVTYPE) %>%
+      summarize(FATALITIES = sum(FATALITIES),
+                INJURIES = sum(INJURIES),
+                TOTALPROPDMG = sum(TOTALPROPDMG*1e-9),
+                TOTALCROPDMG = sum(TOTALCROPDMG*1e-9))
+```
+
+## Results
+
+Now that the data has been processed, it is possible to extract some results. As previously explained, the objective of this study is to answer both the questions:
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+So, the section will be divided in 2 subsections for the population health and the economical damages analysis.
+
+### Population health analysis
+
+To answer the first question, the code presented below, aims to extract the 10 event types that caused the most fatalities and the 10 event types that caused the most injuries. This data will be plotted in a panel plot for easy comparisson.
+
+```{r, fig.width = 8, fig.height =5}
+## Colecting top 10 fatality causes 
+fatals <- validData %>%
+      arrange(desc(FATALITIES)) %>%
+      select(EVTYPE, FATALITIES)%>%
+      slice(1:10)
+
+## Plotting fatalities
+plotFat <- ggplot(fatals, aes(x = EVTYPE, y = FATALITIES)) + 
+      geom_bar(stat = "identity", fill = "darkred") +
+      scale_x_discrete(limits = rev(fatals$EVTYPE)) +
+      labs(x = "", y = "Fatalities") +
+      coord_flip()
+
+## Colecting top 10 injury causes
+injuries <- validData %>%
+      arrange(desc(INJURIES)) %>%
+      select(EVTYPE, INJURIES) %>%
+      slice(1:10)
+
+## Plotting injuries
+plotInj <- ggplot(injuries, aes(x = EVTYPE, y = INJURIES)) + 
+      geom_bar(stat = "identity", fill = "darkblue") +
+      scale_x_discrete(limits = rev(injuries$EVTYPE)) +
+      labs(x = "", y = "Injuries") +
+      coord_flip()
+
+## Printing plots
+### Collecting max widths
+gA <- ggplotGrob(plotFat)
+gB <- ggplotGrob(plotInj)
+maxWidth <-  unit.pmax(gA$widths[2:5], gB$widths[2:5])
+### Defining max widths
+gA$widths[2:5] <- maxWidth
+gB$widths[2:5] <- maxWidth
+### Defining title
+title <- textGrob("Fatalities/Injuries caused by natural events from 2001 to 2011",
+                        gp = gpar(fontface = "bold", fontsize = 15))
+### Plotting (used the right argument to add a margin and make the figure fit)
+grid.arrange(gA, gB, top = title, left = "Event Type", right = "")
+```
+
+### Economical damages analysis
+
+To answer the second question, the same strategy used to answer the first one was used.
+
+```{r, fig.width = 8, fig.height =5}
+## Colecting top 10 property damages causes 
+property <- validData %>%
+      arrange(desc(TOTALPROPDMG)) %>%
+      select(EVTYPE, TOTALPROPDMG)%>%
+      slice(1:10)
+
+## Plotting property damages
+plotProp <- ggplot(property, aes(x = EVTYPE, y = TOTALPROPDMG)) + 
+      geom_bar(stat = "identity", fill = "darkred") +
+      scale_x_discrete(limits = rev(property$EVTYPE)) +
+      scale_y_continuous(breaks = seq(0, 125, by = 25)) +
+      labs(x = "", y = "Total Crop Damages in Billions of USD") +
+      coord_flip()
+
+## Colecting top 10 crop damages causes
+crop <- validData %>%
+      arrange(desc(TOTALCROPDMG)) %>%
+      select(EVTYPE, TOTALCROPDMG) %>%
+      slice(1:10)
+
+## Plotting crop damages
+plotCrop <- ggplot(crop, aes(x = EVTYPE, y = TOTALCROPDMG)) + 
+      geom_bar(stat = "identity", fill = "darkblue") +
+      scale_x_discrete(limits = rev(crop$EVTYPE)) +
+      scale_y_continuous(breaks = seq(0, 7, by = 1)) +
+      labs(x = "", y = "Total Crop Damages in Billions of USD") +
+      coord_flip()
+
+## Printing plots
+### Collecting max widths
+gA <- ggplotGrob(plotProp)
+gB <- ggplotGrob(plotCrop)
+maxWidth <-  unit.pmax(gA$widths[2:5], gB$widths[2:5])
+### Defining max widths
+gA$widths[2:5] <- maxWidth
+gB$widths[2:5] <- maxWidth
+### Defining title
+title <- textGrob("Property/Crop damage caused by natural events from 2001 to 2011",
+                        gp = gpar(fontface = "bold", fontsize = 15))
+### Plotting (used the right argument to add a margin and make the figure fit)
+grid.arrange(gA, gB, top = title, left = "Event Type", right = "")
+```
+
+
+## Appendix
+
+All the data and the cache of the analysis is available at: [https://translate.google.com.br/#pt/en/apendice](https://translate.google.com.br/#pt/en/apendice)
