@@ -5,6 +5,8 @@ output: html_document
 
 ---
 
+## Synopsis
+
 Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern. 
 
 This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
@@ -257,6 +259,8 @@ title <- textGrob("Fatalities/Injuries caused by natural events from 2001 to 201
 grid.arrange(gA, gB, top = title, left = "Event Type", right = "")
 ```
 
+The plot above, shows the top 10 causes of fatalities and injuries in the 2001 to 2011 period. It is possible to observe that tornados were the main cause of fatalities and injuries in that period, followed by excessive heat.
+
 ### Economical damages analysis
 
 To answer the second question, the same strategy used to answer the first one was used.
@@ -305,7 +309,8 @@ title <- textGrob("Property/Crop damage caused by natural events from 2001 to 20
 grid.arrange(gA, gB, top = title, left = "Event Type", right = "")
 ```
 
+The plot above, shows the top 10 causes of property and crop damage in the 2001 to 2011 period. They are show sepparately as the way to prevent both the economical damages may differ. It is possible to observe that floods were the main cause of property damages and drought was the main cause of crop damages. It is important to notice that the magnitude of property damages are much higher than the crop damages as it is shown by the scales in the x axis.
 
 ## Appendix
 
-All the data and the cache of the analysis is available at: [https://translate.google.com.br/#pt/en/apendice](https://translate.google.com.br/#pt/en/apendice)
+All the data and the cache of the analysis is available at: [https://github.com/Harnkal/RepData_PeerAssessment2](https://github.com/Harnkal/RepData_PeerAssessment2)
