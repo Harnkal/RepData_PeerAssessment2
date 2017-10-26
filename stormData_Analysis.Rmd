@@ -308,4 +308,4 @@ grid.arrange(gA, gB, top = title, left = "Event Type", right = "")
 
 ## Appendix
 
-All the data and the cache of the analysis is available at: [https://translate.google.com.br/#pt/en/apendice](https://translate.google.com.br/#pt/en/apendice)
+All the data and the cache of the analysis is available at: [https://github.com/Harnkal/RepData_PeerAssessment2](https://github.com/Harnkal/RepData_PeerAssessment2)
